@@ -34,12 +34,14 @@ The **primary CSMS** has full control — it can send commands like `RemoteStart
 
 ### Using Docker (recommended)
 
+A pre-built image is published automatically to GitHub Container Registry on every push to `main`.
+
 ```bash
 docker run -d \
   -p 9000:9000 \
   -e PRIMARY_CSMS_URL=wss://your-primary-csms.example.com/ocpp \
   -e SECONDARY_CSMS_URLS=wss://analytics.example.com/ocpp \
-  ghcr.io/joulo-nl/joulo-ocpp-proxy
+  ghcr.io/joulo-nl/joulo-ocpp-proxy:main
 ```
 
 ### Using Docker Compose
