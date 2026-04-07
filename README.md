@@ -7,23 +7,28 @@ Built with Node.js and TypeScript. Supports OCPP 1.6 and 2.0.1.
 ## How it works
 
 ```
-                          ┌─────────────────────┐
-                     ←──→ │   Primary CSMS       │  full bidirectional
-┌──────────┐        │     └─────────────────────┘
-│  Charger  │ ←──→  │
-└──────────┘   WS   │     ┌─────────────────────┐
-                     ───→  │   Secondary CSMS A   │  mirror (one-way)
-          OCPP Proxy       └─────────────────────┘
-                     ───→  │   Secondary CSMS B   │  mirror (one-way)
-                           └─────────────────────┘
+                    ┌───────────────────┐
+               ◄───►│  Primary CSMS     │  ◄── full bidirectional
+               │    └───────────────────┘
+┌─────────┐    │    ┌───────────────────┐
+│ Charger  │◄──►│───►│  Secondary CSMS 1 │  ◄── mirror (one-way)
+└─────────┘    │    └───────────────────┘
+               │    ┌───────────────────┐
+               │───►│  Secondary CSMS 2 │  ◄── mirror (one-way)
+               │    └───────────────────┘
+               │            ⋮
+               │    ┌───────────────────┐
+               └───►│  Secondary CSMS N │  ◄── mirror (one-way)
+                    └───────────────────┘
+                OCPP Proxy
 ```
 
-| Direction | Primary CSMS | Secondary CSMS |
+| Direction | Primary CSMS | Secondary CSMS (×N) |
 |---|---|---|
 | Charger → CSMS | ✅ Forwarded | ✅ Mirrored |
 | CSMS → Charger | ✅ Forwarded | ❌ Ignored |
 
-The **primary CSMS** has full control — it can send commands like `RemoteStartTransaction` back to the charger. Secondary backends receive a read-only copy of the charger's messages (boot notifications, meter values, start/stop transactions, etc.), but their responses are never sent back to the charger.
+The **primary CSMS** has full control — it can send commands like `RemoteStartTransaction` back to the charger. You can attach any number of **secondary backends** that receive a read-only copy of the charger's messages (boot notifications, meter values, start/stop transactions, etc.), but their responses are never sent back to the charger. Secondary connections are best-effort — if one fails, it never affects the charger or the primary link.
 
 ## Quick start
 
