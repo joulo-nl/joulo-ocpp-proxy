@@ -1,0 +1,43 @@
+{
+  "name": "joulo-ocpp-proxy",
+  "version": "1.0.0",
+  "description": "Lightweight OCPP 1.6/2.0.1 WebSocket proxy that forwards charger traffic to a primary CSMS and mirrors it to one or more secondary backends.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch & node --watch dist/index.js"
+  },
+  "keywords": [
+    "ocpp",
+    "ocpp-1.6",
+    "ocpp-2.0",
+    "ev-charging",
+    "websocket",
+    "proxy",
+    "csms",
+    "electric-vehicle",
+    "charge-point"
+  ],
+  "author": "Joulo B.V. <info@joulo.nl> (https://joulo.nl)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joulo-nl/joulo-ocpp-proxy.git"
+  },
+  "homepage": "https://github.com/joulo-nl/joulo-ocpp-proxy",
+  "bugs": {
+    "url": "https://github.com/joulo-nl/joulo-ocpp-proxy/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.7.0"
+  }
+}

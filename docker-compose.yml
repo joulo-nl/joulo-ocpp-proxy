@@ -1,0 +1,12 @@
+services:
+  ocpp-proxy:
+    build: .
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - PRIMARY_CSMS_URL=wss://your-primary-csms.example.com/ocpp
+      # Comma-separated list of secondary CSMS URLs (optional)
+      # - SECONDARY_CSMS_URLS=wss://secondary-a.example.com/ocpp,wss://secondary-b.example.com/ocpp
+      - LOG_LEVEL=info
+    restart: unless-stopped
