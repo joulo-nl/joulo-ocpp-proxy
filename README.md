@@ -6,21 +6,20 @@ Built with Node.js and TypeScript. Supports OCPP 1.6 and 2.0.1.
 
 ## How it works
 
-```
-                    ┌───────────────────┐
-               ◄───►│  Primary CSMS     │  ◄── full bidirectional
-               │    └───────────────────┘
-┌─────────┐    │    ┌───────────────────┐
-│ Charger  │◄──►│───►│  Secondary CSMS 1 │  ◄── mirror (one-way)
-└─────────┘    │    └───────────────────┘
-               │    ┌───────────────────┐
-               │───►│  Secondary CSMS 2 │  ◄── mirror (one-way)
-               │    └───────────────────┘
-               │            ⋮
-               │    ┌───────────────────┐
-               └───►│  Secondary CSMS N │  ◄── mirror (one-way)
-                    └───────────────────┘
-                OCPP Proxy
+```mermaid
+graph LR
+    Charger["⚡ Charger"]
+    Proxy["OCPP Proxy"]
+    Primary["Primary CSMS"]
+    S1["Secondary CSMS 1"]
+    S2["Secondary CSMS 2"]
+    SN["Secondary CSMS N"]
+
+    Charger <-->|"OCPP (WS)"| Proxy
+    Proxy <-->|"full bidirectional"| Primary
+    Proxy -->|"mirror"| S1
+    Proxy -->|"mirror"| S2
+    Proxy -.->|"mirror"| SN
 ```
 
 | Direction | Primary CSMS | Secondary CSMS (×N) |
