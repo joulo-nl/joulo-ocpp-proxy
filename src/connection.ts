@@ -17,6 +17,24 @@ import { OCPP_MSG_CALL, OCPP_SUBPROTOCOLS } from "./types";
  *   messages while reconnecting so brief blips don't lose data.
  */
 
+function forwardPing(ws: WebSocket | null, data: Buffer) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  try {
+    ws.ping(data);
+  } catch {
+    /* best-effort — peer may have just closed */
+  }
+}
+
+function forwardPong(ws: WebSocket | null, data: Buffer) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  try {
+    ws.pong(data);
+  } catch {
+    /* best-effort — peer may have just closed */
+  }
+}
+
 const SECONDARY_RECONNECT_DELAY_MS = 10_000;
 const SECONDARY_KEEPALIVE_INTERVAL_MS = 30_000;
 const SECONDARY_PONG_TIMEOUT_MS = 90_000;
@@ -99,11 +117,11 @@ export class ChargerConnection {
     });
 
     this.charger.on("ping", (data) => {
-      this.primary?.ping(data);
+      forwardPing(this.primary, data);
     });
 
     this.charger.on("pong", (data) => {
-      this.primary?.pong(data);
+      forwardPong(this.primary, data);
     });
 
     this.log.info("session started", {
@@ -161,8 +179,8 @@ export class ChargerConnection {
       }
     });
 
-    ws.on("ping", (data) => this.charger.ping(data));
-    ws.on("pong", (data) => this.charger.pong(data));
+    ws.on("ping", (data) => forwardPing(this.charger, data));
+    ws.on("pong", (data) => forwardPong(this.charger, data));
 
     return ws;
   }
