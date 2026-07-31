@@ -6,6 +6,7 @@ import {
 } from "vitest";
 
 import { configureLogger, createLogger } from "../../src/logger";
+import { OCPP_MSG_CALLRESULT } from "../../src/types";
 
 function parseLogEntry(line: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(line);
@@ -85,6 +86,52 @@ describe("logger", () => {
         );
       }
   );
+
+  it("formats an already-decoded frame without reparsing it", () => {
+    const { sink, stdoutEntries } = createSink();
+    configureLogger({ logLevel: "debug", sink });
+    const logger = createLogger("proxy");
+
+    // `raw` is deliberately not valid JSON: the label can only come out right
+    // if the logger trusts the decoded fields instead of parsing again.
+    logger.debugOcppFrame("charger -> proxy", {
+      type: OCPP_MSG_CALLRESULT,
+      id: "xyz",
+      raw: "<<already decoded>>",
+    });
+
+    expect(parseLogEntry(stdoutEntries[0]).message).toBe(
+      "[OCPP RESULT] (xyz): <<already decoded>>"
+    );
+  });
+
+  it("truncates a decoded frame with the configured limit", () => {
+    const { sink, stdoutEntries } = createSink();
+    configureLogger({ logLevel: "debug", sink, debugMessageMaxLength: 8 });
+    const logger = createLogger("proxy");
+
+    logger.debugOcppFrame("charger -> proxy", {
+      type: OCPP_MSG_CALLRESULT,
+      id: "xyz",
+      raw: '[3,"xyz",{"status":"Accepted"}]',
+    });
+
+    expect(parseLogEntry(stdoutEntries[0]).message).toBe(
+      "[OCPP RESULT] (xyz): [3,\"xyz\""
+    );
+  });
+
+  it("labels a frame whose message type it does not recognize", () => {
+    const { sink, stdoutEntries } = createSink();
+    configureLogger({ logLevel: "debug", sink });
+    const logger = createLogger("proxy");
+
+    logger.debugOcppFrame("charger -> proxy", '[9,"abc","Whatever",{}]');
+
+    expect(parseLogEntry(stdoutEntries[0]).message).toBe(
+      '[OCPP UNKNOWN] (9): [9,"abc","Whatever",{}]'
+    );
+  });
 
   it("writes logs to a provided sink", () => {
     const outputSink = createSink();

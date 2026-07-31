@@ -24,10 +24,10 @@ graph LR
 
 | Direction | Primary CSMS | Secondary CSMS (×N) |
 |---|---|---|
-| Charger → CSMS | ✅ Forwarded | ✅ Mirrored |
+| Charger → CSMS | ✅ Forwarded | ✅ Mirrored, except responses |
 | CSMS → Charger | ✅ Forwarded | ❌ Ignored |
 
-The **primary CSMS** has full control — it can send commands like `RemoteStartTransaction` back to the charger. You can attach any number of **secondary backends** that receive a read-only copy of the charger's messages (boot notifications, meter values, start/stop transactions, etc.), but their responses are never sent back to the charger. Secondary connections are best-effort — if one fails, it never affects the charger or the primary link.
+The **primary CSMS** has full control — it can send commands like `RemoteStartTransaction` back to the charger. Secondary backends receive a mirrored copy of everything the charger initiates (boot notifications, meter values, start/stop transactions, etc.). What they don't receive is the charger's *responses* — a `CALLRESULT` or `CALLERROR` answers a command only the primary sent, so mirroring it would hand a secondary a reply to a request it never made. Anything a secondary sends back is logged and discarded — it never reaches the charger. Secondary connections are best-effort — if one fails, it never affects the charger or the primary link.
 
 ### Secondary reliability
 
