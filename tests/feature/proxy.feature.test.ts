@@ -252,6 +252,66 @@ describe("proxy feature", () => {
     expect(await chargerMessage).toBe(responseFrame);
   });
 
+  it("mirrors charger frames to secondaries except its responses", async () => {
+    const callFrame = '[2,"msg-1","Heartbeat",{}]';
+    const resultFrame = '[3,"msg-2",{}]';
+    const garbageFrame = "not-ocpp";
+
+    const primaryConnPromise = waitForConnection(primary);
+    const secondaryConnPromise = waitForConnection(secondary);
+
+    const primaryPort = await startWsServer(primary);
+    const secondaryPort = await startWsServer(secondary);
+    const proxyPort = await allocatePort();
+
+    startProxy({
+      port: proxyPort,
+      primaryCsms: {
+        url: `ws://127.0.0.1:${String(primaryPort)}`,
+        appendChargePointId: true,
+      },
+      secondaryCsms: [
+        {
+          url: `ws://127.0.0.1:${String(secondaryPort)}`,
+          appendChargePointId: true,
+        },
+      ],
+      loggerConfig: {
+        logLevel: "error",
+      },
+    });
+
+    const charger = await connectWhenOpen(
+      `ws://127.0.0.1:${String(proxyPort)}/charger-1`,
+      "ocpp1.6"
+    );
+    openChargers.push(charger);
+
+    const [{ socket: primaryConn }, { socket: secondaryConn }] =
+      await Promise.all([primaryConnPromise, secondaryConnPromise]);
+
+    const primaryFrames: string[] = [];
+    primaryConn.on("message", (data) => {
+      primaryFrames.push(rawDataToString(data));
+    });
+    const secondaryFrames: string[] = [];
+    secondaryConn.on("message", (data) => {
+      secondaryFrames.push(rawDataToString(data));
+    });
+
+    charger.send(resultFrame);
+    charger.send(garbageFrame);
+    charger.send(callFrame);
+    await sleep(250);
+
+    // The primary sees everything. The secondary sees everything the charger
+    // initiated — including the frame the proxy couldn't parse, so an
+    // unrecognized message type is never silently dropped from the mirror —
+    // but not the response, which answers a request only the primary made.
+    expect(primaryFrames).toEqual([resultFrame, garbageFrame, callFrame]);
+    expect(secondaryFrames).toEqual([garbageFrame, callFrame]);
+  });
+
   it("accepts charger URLs with query parameters", async () => {
     const primaryConnPromise = waitForConnection(primary);
 

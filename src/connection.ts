@@ -1,7 +1,12 @@
 import WebSocket from "ws";
 import type { CsmsBackend } from "./config";
 import { createLogger } from "./logger";
-import { OCPP_SUBPROTOCOLS } from "./types";
+import {
+  OCPP_MSG_CALLERROR,
+  OCPP_MSG_CALLRESULT,
+  OCPP_SUBPROTOCOLS,
+} from "./types";
+import { decodeOcppFrame } from "./utils/ocpp";
 import { forwardPing, forwardPong, rawDataToString } from "./utils/websocket";
 import { resolveCsmsUrl } from "./utils/url";
 
@@ -11,8 +16,10 @@ import { resolveCsmsUrl } from "./utils/url";
  *   Charger  ←─→  Proxy  ←─→  Primary CSMS
  *                         ──→  Secondary CSMS (mirror, one-way)
  *
- * - Messages from the charger are forwarded to the primary and mirrored
- *   to all secondaries.
+ * - All messages from the charger are forwarded to the primary. Everything
+ *   except its responses (CALLRESULT / CALLERROR) is mirrored to secondaries:
+ *   a response belongs to whoever sent the request, and only the primary ever
+ *   sends one.
  * - Only the primary CSMS can send commands back to the charger.
  * - Secondary connections are best-effort; failures never affect the
  *   charger or the primary link. Secondaries auto-reconnect, send
@@ -72,24 +79,26 @@ export class ChargerConnection {
 
     this.charger.on("message", (data) => {
       const raw = rawDataToString(data);
-      this.log.debugOcppFrame("charger → proxy", raw);
+      const msg = decodeOcppFrame(raw);
+      this.log.debugOcppFrame("charger → proxy", msg ?? raw);
 
       if (this.primary?.readyState === WebSocket.OPEN) {
         this.primary.send(raw);
       }
 
+      // Withhold responses only: a secondary never sent the request, so the
+      // reply is meaningless to it. Anything else the charger initiates is
+      // mirrored — including frames this proxy can't parse and message types it
+      // doesn't know yet — so the mirror stays complete as OCPP adds them.
+      if (
+        msg?.type === OCPP_MSG_CALLRESULT ||
+        msg?.type === OCPP_MSG_CALLERROR
+      ) {
+        return;
+      }
+
       for (const sec of this.secondaries) {
-        if (sec.ws?.readyState === WebSocket.OPEN) {
-          try {
-            sec.ws.send(raw);
-          } catch (err) {
-            /* best-effort */
-            this.log.warn("secondary send failed", {
-              url: sec.url,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        } else {
+        if (!this.sendToSecondary(sec, raw)) {
           this.enqueueForSecondary(sec, raw);
         }
       }
@@ -233,6 +242,24 @@ export class ChargerConnection {
     });
 
     return ws;
+  }
+
+  /**
+   * Mirror one frame to a secondary. Returns false when the frame could not be
+   * handed off, so the caller can queue it for the next reconnect.
+   */
+  private sendToSecondary(state: SecondaryState, raw: string): boolean {
+    if (state.ws?.readyState !== WebSocket.OPEN) return false;
+    try {
+      state.ws.send(raw);
+      return true;
+    } catch (err) {
+      this.log.warn("secondary send failed", {
+        url: state.url,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
   }
 
   private enqueueForSecondary(state: SecondaryState, raw: string) {
